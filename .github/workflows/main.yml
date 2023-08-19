@@ -1,0 +1,73 @@
+name: Lambda CI
+
+on:
+  push:
+    branches:
+      - 'main'
+      - '!yashwanth355-patch-1'
+      - '!yashwanth355-patch-2'
+      
+  pull_request:
+    branches:    
+      - 'main'
+      - '!yashwanth355-patch-1'
+      - '!yashwanth355-patch-2'
+
+env:
+  Deploy_Route_Url: ${{secrets.AWS_DEPLOY_DEV_ENV}}
+  AWS_REGION: "ap-south-1"
+
+jobs:
+ build:
+  runs-on: ubuntu-latest
+  strategy: 
+    matrix:
+      go-version: [1.17]
+      
+  steps:
+   - name: check the code
+     uses: actions/Checkout@v2
+   - name: Configure AWS credentials
+     uses: aws-actions/configure-aws-credentials@v1
+     with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+   - name: test
+     run: echo "tested"
+     
+   - name: setup go
+     uses: actions/setup-go@v2
+     with:
+       go-version: ${{ matrix.go-version }}
+     env:
+      GO111MODULE: "on"
+
+   -  name: Install Terraform
+      uses: little-core-labs/install-terraform@v2.0.0
+      with:
+          version: 1.1.2
+
+   - name: check setup
+     run: |
+     
+       go mod init Go-Lambda
+       go mod tidy
+ 
+   - name: Build Go functions
+     run: |
+     
+       cd Project/Leads_Module/getLeadsInfo
+       env GOOS=linux GOARCH=amd64 go build -o ../../bin/getLeadsInfo
+       cd ../..
+   -  name: terraform init
+      run: |
+     
+       cd Project/Infrastructure
+       terraform init
+
+   -  name: terraform apply approve
+      run: |
+       cd Project/Infrastructure
+       terraform apply -auto-approve
